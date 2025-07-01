@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  registry-server:
+    image: registry:2.8.2
+    restart: always
+    environment:
+      # Listen on port 443 (standard HTTPS) instead of the default 5000
+#      REGISTRY_HTTP_ADDR: "0.0.0.0:443"
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin: '[http://registry-ui:80]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods: '[HEAD,GET,OPTIONS,DELETE]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials: '[true]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers: '[Authorization,Accept,Cache-Control]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers: '[Docker-Content-Digest]'
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+      REGISTRY_AUTH: "htpasswd"
+      REGISTRY_AUTH_HTPASSWD_PATH: "/etc/registry/auth/htpasswd"
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+  #    REGISTRY_HTTP_TLS_CERTIFICATE: /etc/registry/ssl/registry.crt
+ #     REGISTRY_HTTP_TLS_KEY: /etc/registry/ssl/registry.key
+      REGISTRY_HTTP_SECRET: "pass"  # Ensure this secret is used
+    volumes:
+      - ./registry/auth:/etc/registry/auth
+#      - ./ssl:/etc/registry/ssl  # Mount SSL certificates
+    container_name: registry-server
+    ports:
+      - "5000:5000"    # Expose only HTTPS port
+
+  registry-ui:
+    image: joxit/docker-registry-ui:main
+    restart: always
+    ports:
+      - "9000:80"    # Expose HTTP port for the UI
+    environment:
+      - SINGLE_REGISTRY=true
+      - REGISTRY_TITLE=Docker Registry UI
+      - DELETE_IMAGES=true
+      - SHOW_CONTENT_DIGEST=true
+      # Update the backend URL to point to the registry on its new HTTPS port (443)
+      - NGINX_PROXY_PASS_URL=http://registry-server:5000
+      - SHOW_CATALOG_NB_TAGS=true
+      - CATALOG_MIN_BRANCHES=1
+      - CATALOG_MAX_BRANCHES=1
+      - TAGLIST_PAGE_SIZE=100
+      - REGISTRY_SECURED=true
+      - CATALOG_ELEMENTS_LIMIT=1000
+      - NGINX_PROXY_AUTH=true           # Enable authentication for UI
+      - NGINX_PROXY_AUTH_USER=${REGISTRY_USERNAME}   # Provided via .env file
+      - NGINX_PROXY_AUTH_PASSWORD=${REGISTRY_PASSWORD} # Provided via .env file
+    container_name: registry-ui
+    depends_on:
+      - registry-server
+
+networks:
+  default:
+    driver: bridge

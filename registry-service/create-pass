@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# This will create a auth password under /registry/auth
+htpasswd -cb ./registry/auth/htpasswd admin pass
